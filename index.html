@@ -1,0 +1,50 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Markdown Renderer</title>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/highlight.js@11/styles/github.min.css">
+    <link rel="stylesheet" href="https://matcha.mizu.sh/matcha.css">
+</head>
+<body>
+    <div id="content" class="markdown-body"></div>
+
+    <script src="https://cdn.jsdelivr.net/npm/markdown-it@12/dist/markdown-it.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/highlight.js@11/lib/core.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/highlight.js@11/lib/languages/json.min.js"></script>
+    <script>
+        async function fetchAndRenderMarkdown() {
+            try {
+                const response = await fetch('README.md');
+                const markdown = await response.text();
+
+                const md = window.markdownit({
+                    highlight: function (str, lang) {
+                        if (lang && highlight.getLanguage(lang)) {
+                            try {
+                                return highlight.highlight(str, { language: lang }).value;
+                            } catch (__) {}
+                        }
+                        return ''; // use external default escaping
+                    }
+                });
+
+                const result = md.render(markdown);
+                document.getElementById('content').innerHTML = result;
+
+                // Set document title to the first h1 content
+                const h1 = document.querySelector('.markdown-body h1');
+                if (h1) {
+                    document.title = h1.textContent;
+                }
+            } catch (error) {
+                document.getElementById('content').innerText = 'Error fetching README.md';
+                console.error('Error:', error);
+            }
+        }
+
+        fetchAndRenderMarkdown();
+    </script>
+</body>
+</html>
