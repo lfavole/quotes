@@ -1,0 +1,11 @@
+image: alpine:latest
+
+pages:
+  script:
+    - mkdir -p public
+    - find . -mindepth 1 -maxdepth 1 ! -name public -exec cp -r {} public/ \;
+  artifacts:
+    paths:
+      - public/
+  rules:
+    - if: $CI_COMMIT_REF_NAME == $CI_DEFAULT_BRANCH
