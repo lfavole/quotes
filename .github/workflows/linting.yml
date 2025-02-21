@@ -39,3 +39,6 @@ jobs:
 
       - name: Run ruff format --check
         run: uv run ruff format --check .
+
+      - name: Check quotes format
+        run: uv run scripts/check_quotes.py
