@@ -1,3 +1,5 @@
+"""Check that the quotes are correctly formatted."""
+
 from pathlib import Path
 
 from quotes import Folder

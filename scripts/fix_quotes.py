@@ -1,3 +1,5 @@
+"""Fix the quotes in their folders."""
+
 from pathlib import Path
 
 from quotes import Folder

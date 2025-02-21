@@ -9,10 +9,7 @@ from pathlib import Path
 from quotes import Folder
 
 BASE = Path(__file__).parent.parent.resolve()
-URL = (
-    os.environ.get("GOOGLE_SHEETS_URL")
-    or (BASE / ".google_sheets_url").read_text("utf-8").strip()
-)
+URL = os.environ.get("GOOGLE_SHEETS_URL") or (BASE / ".google_sheets_url").read_text("utf-8").strip()
 
 
 if __name__ == "__main__":
@@ -33,13 +30,11 @@ if __name__ == "__main__":
             continue
 
         folder = Folder(folder_path)
-        folder.add(
-            [
-                row["Citation"],
-                row["Auteur (la personne qui a dit la citation)"],
-                row["Source (œuvre, chanson, ...)"],
-            ]
-        )
+        folder.add([
+            row["Citation"],
+            row["Auteur (la personne qui a dit la citation)"],
+            row["Source (œuvre, chanson, ...)"],
+        ])
 
         quotes_count += 1
 

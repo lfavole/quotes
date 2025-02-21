@@ -1,5 +1,7 @@
-from pathlib import Path
+"""Prompt the user to add a quote."""
+
 import sys
+from pathlib import Path
 
 from quotes import Folder
 
