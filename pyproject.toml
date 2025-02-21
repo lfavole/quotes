@@ -3,6 +3,11 @@ name = "quotes"
 version = "0.1.0"
 requires-python = ">=3.12"
 
+[tool.pyright]
+strict = ["**"]
+reportMissingImports = "error"
+reportMissingTypeStubs = false
+
 [tool.ruff]
 line-length = 120
 

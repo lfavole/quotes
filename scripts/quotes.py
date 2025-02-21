@@ -5,7 +5,7 @@ import warnings
 from collections.abc import Generator
 from contextlib import contextmanager
 from pathlib import Path
-from typing import Any, TypeVar
+from typing import Any, TypeVar, cast, overload
 
 MAX_QUOTES_PER_FILE = 100
 
@@ -65,6 +65,24 @@ class Folder:
         else:
             return True
 
+    @overload
+    @staticmethod
+    @contextmanager
+    def open_file(
+        file: Path,
+        datatype: type[T],
+        save: bool = False,
+    ) -> Generator[T, None, None]: ...
+
+    @overload
+    @staticmethod
+    @contextmanager
+    def open_file(
+        file: Path,
+        datatype: None = None,
+        save: bool = False,
+    ) -> Generator[dict[str, Any] | list[list[str]], None, None]: ...
+
     @staticmethod
     @contextmanager
     def open_file(
@@ -72,14 +90,24 @@ class Folder:
         datatype: type[T] | None = None,
         save: bool = False,
     ) -> Generator[T, None, None]:
-        """Open the given JSON file and optionally `save` it."""
+        """
+        Open the given JSON file and optionally `save` it.
+
+        Raises:
+            TypeError: if the data has a wrong type (not dict/list).
+
+        """
         try:
             data = json.loads(file.read_text("utf-8"))
         except FileNotFoundError:
             data = {}
-        if datatype is dict and not isinstance(data, dict):
+        if not isinstance(data, dict | list):
+            msg = f"Wrong type for data in {file}"
+            raise TypeError(msg)
+        data = cast("dict[str, Any] | list[list[str]]", data)
+        if datatype is dict and isinstance(data, list):
             data = {"items": data}
-        if datatype is list and not isinstance(data, list):
+        if datatype is list and isinstance(data, dict):
             data = data.get("items", [])
         yield data  # type: ignore[reportReturnType]
         if save:
@@ -107,7 +135,7 @@ class Folder:
         return files
 
     @staticmethod
-    def get_items(data: dict[str, Any] | list[Any]) -> list[list[str]]:
+    def get_items(data: dict[str, Any] | list[list[str]]) -> list[list[str]]:
         """Return the quotes list in a JSON file."""
         return data.get("items", data) if isinstance(data, dict) else data
 
@@ -118,12 +146,12 @@ class Folder:
 
         index_file = self.path / "0.json"
 
-        with self.open_file(index_file, datatype=dict) as data:
+        with self.open_file(index_file, datatype=dict[str, Any]) as data:
             if data.get("items") is not None:
                 files = [index_file, *files]
 
         for file in files:
-            with self.open_file(file) as data:
+            with self.open_file(file, datatype=list[list[str]]) as data:
                 total += len(self.get_items(data))
 
         return total
@@ -133,7 +161,7 @@ class Folder:
         """Fix a quote item (quote, author, ...) by removing non-ASCII characters."""
         return item.replace("\xa0", " ").replace("\u2019", "'").replace("\xab ", '"').replace(" \xbb", '"')
 
-    def fix_quotes(self, quotes: list) -> list[list[str]]:
+    def fix_quotes(self, quotes: list[list[str]]) -> list[list[str]]:
         """Fix the quotes by removing non-ASCII characters."""
         return [[self.fix_item(item) for item in quote] for quote in quotes]
 
@@ -147,10 +175,12 @@ class Folder:
         total = self.get_total(files)
 
         index_file = self.path / "0.json"
-        with self.open_file(index_file) as data:
-            if not isinstance(data, dict):
+        with self.open_file(index_file) as old_data:
+            if not isinstance(old_data, dict):
                 warnings.warn(f"No dict structure in file {index_file}", stacklevel=2)
-                data = {"items": data}  # noqa: PLW2901
+                data: dict[str, Any] = {"items": old_data}
+            else:
+                data = old_data
 
             if data.get("total", 0) != total:
                 warnings.warn(f"Total of {data['total']} doesn't match the length of {total}", stacklevel=2)
@@ -163,12 +193,14 @@ class Folder:
 
     def check_file(self, file: Path, last: bool = False) -> None:
         """Check the structure and the total and end attributes in a quotes file."""
-        with self.open_file(file) as data:
-            if isinstance(data, dict):
+        with self.open_file(file) as old_data:
+            if isinstance(old_data, dict):
                 warnings.warn(f"Dict structure in file {file}", stacklevel=2)
-                if "items" not in data:
+                if "items" not in old_data:
                     warnings.warn(f"No items section in file {file}", stacklevel=2)
-                data = data.get("items", [])  # noqa: PLW2901
+                data: list[list[str]] = old_data.get("items", [])
+            else:
+                data = old_data
 
             number_of_items = len(self.get_items(data))
             if number_of_items > MAX_QUOTES_PER_FILE or (not last and number_of_items < MAX_QUOTES_PER_FILE):
@@ -190,13 +222,13 @@ class Folder:
         total = self.get_total(files)
 
         index_file = self.path / "0.json"
-        with self.open_file(index_file, datatype=dict, save=True) as data:
+        with self.open_file(index_file, datatype=dict[str, Any], save=True) as data:
             if data.get("items") is not None:
                 files.insert(0, index_file)
 
         # Check the quotes number, split between files
         filename_index = 1
-        stack = []
+        stack: list[list[str]] = []
 
         def fill_file(end: bool = False) -> bool:
             """
@@ -206,21 +238,25 @@ class Folder:
             """
             nonlocal filename_index, stack
             if stack and (end or len(stack) > MAX_QUOTES_PER_FILE):
-                with self.open_file(self.new_path / f"{filename_index}.json", datatype=list, save=True) as data:
+                with self.open_file(
+                    self.new_path / f"{filename_index}.json",
+                    datatype=list[list[str]],
+                    save=True,
+                ) as data:
                     data[:], stack = stack[:MAX_QUOTES_PER_FILE], stack[MAX_QUOTES_PER_FILE:]
                     filename_index += 1
                 return True
             return False
 
         for file in files:
-            with self.open_file(file) as data:
+            with self.open_file(file, datatype=list[list[str]]) as data:
                 stack.extend(self.get_items(data))
                 fill_file()
                 # Remove the old file
                 file.unlink()
 
         # Create the 0.json file with the total attribute
-        with self.open_file(self.new_path / "0.json", datatype=dict, save=True) as data:
+        with self.open_file(self.new_path / "0.json", datatype=dict[str, Any], save=True) as data:
             data["total"] = total
             data["chunk_size"] = MAX_QUOTES_PER_FILE
 
@@ -238,14 +274,12 @@ class Folder:
         """Add a quote to the folder."""
         file = self.get_files()[-1]
 
-        with self.open_file(file, datatype=dict, save=True) as data:
-            if len(data["items"]) >= MAX_QUOTES_PER_FILE:
+        with self.open_file(file, datatype=list[list[str]], save=True) as data:
+            if len(data) >= MAX_QUOTES_PER_FILE:
                 file = self.path / f"{self.get_number(file) + 1}.json"
 
-        with self.open_file(file, datatype=dict, save=True) as data:
-            if "items" not in data:
-                data["items"] = []
-            data["items"].append(quote)
+        with self.open_file(file, datatype=list[list[str]], save=True) as data:
+            data.append(quote)
 
         with warnings.catch_warnings(action="ignore"):
             self.check()
