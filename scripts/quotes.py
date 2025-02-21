@@ -159,20 +159,16 @@ class Folder:
                 warnings.warn(f"Items section in file {index_file}", stacklevel=2)
 
         for i, file in enumerate(files, start=-len(files)):
-            self.check_file(file, total, last=i == -1)
+            self.check_file(file, last=i == -1)
 
-    def check_file(self, file: Path, total: int, last: bool = False) -> None:
+    def check_file(self, file: Path, last: bool = False) -> None:
         """Check the structure and the total and end attributes in a quotes file."""
         with self.open_file(file) as data:
-            if not isinstance(data, dict):
-                warnings.warn(f"No dict structure in file {file}", stacklevel=2)
-                data = {"items": data}  # noqa: PLW2901
-
-            if "items" not in data:
-                warnings.warn(f"No items section in file {file}", stacklevel=2)
-
-            if data.get("total", 0) != total:
-                warnings.warn(f"Total of {data.get('total', 0)} doesn't match the length of {total}", stacklevel=2)
+            if isinstance(data, dict):
+                warnings.warn(f"Dict structure in file {file}", stacklevel=2)
+                if "items" not in data:
+                    warnings.warn(f"No items section in file {file}", stacklevel=2)
+                data = data.get("items", [])  # noqa: PLW2901
 
             number_of_items = len(self.get_items(data))
             if number_of_items > MAX_QUOTES_PER_FILE or (not last and number_of_items < MAX_QUOTES_PER_FILE):
@@ -180,11 +176,6 @@ class Folder:
                     f"Total of {number_of_items} doesn't match the maximum quotes number of {MAX_QUOTES_PER_FILE}",
                     stacklevel=2,
                 )
-
-            if not last and data.get("end") is not False:
-                warnings.warn(f"No end: false attribute in file {file}", stacklevel=2)
-            if last and data.get("end") is not True:
-                warnings.warn(f"No end: true attribute in file {file}", stacklevel=2)
 
             for quote in self.get_items(data):
                 for item in quote:
