@@ -1,2 +1,3 @@
 *.pyc
 .google_sheets_url
+uv.lock
