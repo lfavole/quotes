@@ -1,0 +1,160 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Quotes</title>
+    <style>
+        table {
+            width: 100%;
+            border-collapse: collapse;
+        }
+        th, td {
+            border: 1px solid black;
+            padding: 8px;
+            text-align: left;
+        }
+        th {
+            background-color: #f2f2f2;
+        }
+    </style>
+</head>
+<body>
+    <h1>Quotes</h1>
+    <div id="currentPath"></div>
+    <table id="files"></table>
+    <table id="quotes-table">
+        <thead>
+            <tr>
+                <th>Quote</th>
+                <th>Author</th>
+                <th>Source</th>
+            </tr>
+        </thead>
+        <tbody>
+        </tbody>
+    </table>
+
+    <script>
+        document.addEventListener("DOMContentLoaded", function() {
+            var currentPath = location.hash.substr(1) || "/fr/general";
+
+            var filesTable = document.getElementById("files");
+
+            var itemsCache = {};
+
+            async function getItems(path) {
+                if (itemsCache[path]) {
+                    return itemsCache[path];
+                }
+
+                const response = await fetch("https://api.github.com/repos/lfavole/quotes/contents" + path);
+                if (!response.ok) {
+                    throw new Error(`HTTP error! status: ${response.status}`);
+                }
+                const data = await response.json();
+                const files = data.filter(item => item.type === "dir");
+                itemsCache[path] = files;
+                return files;
+            }
+
+            async function updateDirectoryListing() {
+                document.getElementById("currentPath").textContent = currentPath;
+
+                // remove all options
+                while (filesTable.firstChild) {
+                    filesTable.removeChild(filesTable.firstChild);
+                }
+
+                getItems(currentPath)
+                    .then(files => {
+                        files.forEach(file => {
+                            var row = filesTable.insertRow();
+                            var cell = row.insertCell();
+                            cell.textContent = file.name;
+                        });
+                    });
+
+                if(currentPath != "") {
+                    // also add ".."
+                    var row = filesTable.insertRow();
+                    var cell = row.insertCell();
+                    cell.textContent = "..";
+                }
+            }
+
+            filesTable.addEventListener("click", function(event) {
+                if (event.target.tagName === "TD") {
+                    if (event.target.textContent === "..") {
+                        currentPath = currentPath.replace(/\/[^\/]+?$/, "");
+                    } else {
+                        currentPath += "/" + event.target.textContent;
+                    }
+                    location.hash = currentPath;
+                }
+            });
+
+            window.addEventListener("hashchange", function() {
+                currentPath = location.hash.substr(1);
+                updateDirectoryListing();
+                loadQuotes();
+            });
+
+            setTimeout(updateDirectoryListing, 0);
+
+            const baseUrl = "https://lfavole.github.io/quotes";
+
+            async function fetchData(url) {
+                const response = await fetch(url);
+                if (response.status === 404) {
+                    return null;
+                }
+                if (!response.ok) {
+                    throw new Error(`HTTP error! status: ${response.status}`);
+                }
+                return response.json();
+            }
+
+            async function loadQuotes() {
+                displayQuotes([]);
+
+                try {
+                    const initialData = await fetchData(baseUrl + currentPath + "/0.json");
+                    if (initialData === null) {
+                        return;
+                    }
+                    const totalQuotes = initialData.total;
+                    const chunkSize = initialData.chunk_size;
+                    const numFiles = Math.ceil(totalQuotes / chunkSize);
+                    const quotes = [];
+
+                    for (let i = 1; i <= numFiles; i++) {
+                        const data = await fetchData(baseUrl + currentPath + "/" + i + ".json");
+                        quotes.push(...data);
+                    }
+
+                    displayQuotes(quotes);
+                } catch (error) {
+                    console.error("Error fetching data:", error);
+                }
+            }
+
+            function displayQuotes(quotes) {
+                const tableBody = document.getElementById("quotes-table").getElementsByTagName("tbody")[0];
+                while (tableBody.firstChild) {
+                    tableBody.removeChild(tableBody.firstChild);
+                }
+                quotes.forEach(quote => {
+                    const row = tableBody.insertRow();
+                    // Create 3 cell for each item in the quote list. If the item doesn't exist, an empty cell will be created.
+                    for (let i = 0; i < 3; i++) {
+                        const cell = row.insertCell();
+                        cell.textContent = quote[i] || "";
+                    }
+                });
+            }
+
+            loadQuotes();
+        });
+    </script>
+</body>
+</html>

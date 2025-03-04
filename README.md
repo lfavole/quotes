@@ -1,5 +1,7 @@
 # Static quotes API
 
+[See the quotes here.](view/index.html)
+
 This repository contains quotes available as JSON files.
 
 ## Folders structure
